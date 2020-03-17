@@ -1,37 +1,59 @@
-import React, { useState, useEffect, Fragment } from "react";
+import React, { useState, useEffect, Fragment, useReducer } from "react";
 import axios from "axios";
 import "./App.css";
 
-function App() {
-  const [data, setData] = useState({ hits: [] });
-  const [query, setQuery] = useState("redux");
-  const [url, setUrl] = useState(
-    `https://hn.algolia.com/api/v1/search?query=redux`
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [isError, setIsError] = useState(false);
+function dataFetchReducer(state, action) {
+  switch (action.type) {
+    case "FETCH_INIT":
+      return { ...state, isLoading: true, isError: false };
+    case "FETCH_SUCCESS":
+      return { ...state, isLoading: false, data: action.payload };
+    case "FETCH_FAILURE":
+      return { ...state, isLoading: false, isError: true };
+    default:
+      throw new Error();
+  }
+}
+
+function useDataApi(initialUrl, initialData) {
+  const [url, setUrl] = useState(initialUrl);
+  const [state, dispatch] = useReducer(dataFetchReducer, {
+    isLoading: false,
+    isError: false,
+    data: initialData
+  });
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsError(false);
-      setIsLoading(true);
+      dispatch({ type: "FETCH_INIT" });
       try {
         const result = await axios(url);
-        setData(result.data);
+        dispatch({ type: "FETCH_SUCCESS", payload: result.data });
       } catch (error) {
-        setIsError(true);
+        dispatch({ type: "FETCH_FAILURE" });
       }
-      setIsLoading(false);
     };
 
     fetchData();
   }, [url]);
 
+  return [state, setUrl];
+}
+
+function App() {
+  const [query, setQuery] = useState("redux");
+  const [{ data, isLoading, isError }, doFetch] = useDataApi(
+    `https://hn.algolia.com/api/v1/search?query=${query}`,
+    {
+      hits: []
+    }
+  );
+
   return (
     <Fragment>
       <form
         onSubmit={event => {
-          setUrl(`https://hn.algolia.com/api/v1/search?query=${query}`);
+          doFetch(`https://hn.algolia.com/api/v1/search?query=${query}`);
           event.preventDefault();
         }}
       >
